@@ -1,0 +1,283 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>  Linux文件描述符到底是什么？ |    JIANG Tao&#39;blog.</title>
+  <meta name="description" content="蒋涛的计算机学习博客.">
+  <!-- 标签页图标 -->
+  
+  <link rel="shortcut icon" href="https://cdn.jsdelivr.net/gh/RgazHTale/blog-img/202203311342444.jpg" type="image/x-icon">
+  
+
+  <!-- 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@2.2.0/fonts/remixicon.css" rel="stylesheet">
+  <!-- 动画库 -->
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fushaolei/cdn-white@1.0/css/animate.css"/>
+  
+  <!-- css文件 -->
+  
+<link rel="stylesheet" href="/css/white.css">
+
+  <!-- 代码高亮 -->
+  
+    
+      
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10.1.1/styles/github.css">
+
+    
+  
+<meta name="generator" content="Hexo 5.4.1"></head>
+
+
+<body>
+
+<div class="menu-outer">
+    <div class="menu-inner">
+      <div class="menu-site-name  animate__animated  animate__fadeInUp">
+        <a href="/">
+          JIANG Tao&#39;blog.
+        </a>
+        
+      </div>
+      <div class="menu-group">
+        <ul class="menu-ul">
+        
+          <a href="/" class="nav-link">
+            <li class="menu-li  animate__animated  animate__fadeInUp">
+              HOME
+            </li>
+          </a>
+        
+          <a href="/archives" class="nav-link">
+            <li class="menu-li  animate__animated  animate__fadeInUp">
+              BLOG
+            </li>
+          </a>
+        
+        
+          <li class="menu-li animate__animated  animate__fadeInUp" id="sort">
+             文章分类
+             <div class="categories-outer " id="sort-div">
+               <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Linux/">Linux</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%B1%87%E7%BC%96%E8%AF%AD%E8%A8%80/">汇编语言</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/">设计模式</a></li></ul>
+             </div>
+          </li>
+        
+        
+          <li class="menu-li animate__animated  animate__fadeInUp" id="mobile-menu">
+            <i class="ri-menu-line"></i>
+          </li>
+        
+        </ul>
+
+      </div>
+
+    </div>
+</div>
+<div id="mobile-main" class="animate__animated  animate__fadeIn">
+  <div class="mobile-menu-inner">
+    <div class="mobile-menu-site-name animate__animated  animate__fadeInUp">
+      <a href="/">
+        JIANG Tao&#39;blog.
+      </a>
+    </div>
+    <div class="mobile-menu-group" id="mobile-close">
+      <i class="ri-close-line"></i>
+    </div>
+
+  </div>
+
+  <div class="mobile-menu-div">
+  
+    <a href="/" class="mobile-nav-link">
+      <div class="mobile-menu-child animate__animated  animate__fadeInUp">
+        <span>HOME</span>
+      </div>
+    </a>
+  
+    <a href="/archives" class="mobile-nav-link">
+      <div class="mobile-menu-child animate__animated  animate__fadeInUp">
+        <span>BLOG</span>
+      </div>
+    </a>
+  
+  
+  </div>
+
+
+</div>
+
+<div class="body-outer">
+  <div class="body-inner">
+    
+<article class="post-inner">
+  <div class="post-content-outer">
+    <div class="post-intro">
+      <div class="post-title animate__animated  animate__fadeInUp">Linux文件描述符到底是什么？</div>
+      <div class="meta-intro animate__animated  animate__fadeInUp">Sep 28 2022</div>
+      
+    </div>
+    <div class="post-content-inner">
+      <div class="post-content-inner-space">
+
+      </div>
+      <div class="post-content-main animate__animated  animate__fadeInUp">
+        <!-- top型目录 -->
+        
+        <p>本文源自<a target="_blank" rel="noopener" href="http://c.biancheng.net/view/3066.html">Linux文件描述符到底是什么？ (biancheng.net)</a></p>
+<p><strong>前言</strong></p>
+<p><a target="_blank" rel="noopener" href="http://c.biancheng.net/view/2852.html">Linux 中一切皆文件</a>，比如 <a target="_blank" rel="noopener" href="http://c.biancheng.net/cplus/">C++</a> 源文件、视频文件、Shell脚本、可执行文件等，就连键盘、显示器、鼠标等硬件设备也都是文件。</p>
+<p>一个 Linux 进程可以打开成百上千个文件，为了表示和区分已经打开的文件，Linux 会给每个文件分配一个编号（一个 ID），这个编号就是一个整数，被称为文件描述符（File Descriptor）。</p>
+<p>这只是一个形象的比喻，为了让读者容易理解我才这么说。如果你也仅仅理解到这个层面，那不过是浅尝辄止而已，并没有看到文件描述符的本质。</p>
+<p>本篇文章的目的就是拨云见雾，从底层实现的角度来给大家剖析一下文件描述符，看看文件描述如到底是如何表示一个文件的。</p>
+<p>不过，阅读本篇文章需要你有C语言编程基础，至少要理解数组、指针和结构体；如果理解内存，那就更好了，看了这篇文章你会醍醐灌顶。</p>
+<p>好了，废话不多说，让我们马上进入正题吧。</p>
+<h1 id="Linux文件描述符到底是什么？"><a href="#Linux文件描述符到底是什么？" class="headerlink" title="Linux文件描述符到底是什么？"></a>Linux文件描述符到底是什么？</h1><p>一个 Linux 进程启动后，会在内核空间中创建一个 PCB 控制块，PCB 内部有一个文件描述符表（File descriptor table），记录着当前进程所有可用的文件描述符，也即当前进程所有打开的文件。</p>
+<p>内核空间是虚拟地址空间的一部分，想死磕的读者请猛击《<a target="_blank" rel="noopener" href="http://c.biancheng.net/c/140/">C语言内存精讲</a>》，不想纠缠细节的读者可以这样理解：进程启动后要占用内存，其中一部分内存分配给了文件描述符表。</p>
+<p>除了文件描述符表，系统还需要维护另外两张表：</p>
+<ul>
+<li>打开文件表（Open file table）</li>
+<li>i-node 表（i-node table）</li>
+</ul>
+<p>文件描述符表每个进程都有一个，打开文件表和 i-node 表整个系统只有一个，它们三者之间的关系如下图所示。</p>
+<p>
+        <span class="lazyload-img-span">
+        <img   
+           data-src="https://cdn.jsdelivr.net/gh/RgazHTale/blog-img@master/img/202209281617318.png" >
+        </sapn>
+      </p>
+<p>从本质上讲，这三种表都是结构体数组，0、1、2、73、1976 等都是数组下标。表头只是我自己添加的注释，数组本身是没有的。实线箭头表示指针的指向，虚线箭头是我自己添加的注释。</p>
+<p>**ps:**图中前两个应该是文件描述符表，文件描述符只是数字下标！</p>
+<p><strong>你看，文件描述符只不过是一个数组下标吗！</strong></p>
+<p>通过文件描述符，可以找到文件指针，从而进入打开文件表。该表存储了以下信息：</p>
+<ul>
+<li>文件偏移量，也就是文件内部指针偏移量。调用 read() 或者 write() 函数时，文件偏移量会自动更新，当然也可以使用 lseek() 直接修改。</li>
+<li>状态标志，比如只读模式、读写模式、追加模式、覆盖模式等。</li>
+<li>i-node 表指针。</li>
+</ul>
+<p>然而，要想真正读写文件，还得通过打开文件表的 i-node 指针进入 i-node 表，该表包含了诸如以下的信息：</p>
+<ul>
+<li>文件类型，例如常规文件、套接字或 FIFO。</li>
+<li>文件大小。</li>
+<li>时间戳，比如创建时间、更新时间。</li>
+<li>文件锁。</li>
+</ul>
+<p>对上图的进一步说明：</p>
+<ul>
+<li>在进程 A 中，文件描述符 1 和 20 都指向了同一个打开文件表项，标号为 23（指向了打开文件表中下标为 23 的数组元素），这可能是通过调用 dup()、dup2()、fcntl() 或者对同一个文件多次调用了 open() 函数形成的。</li>
+<li>进程 A 的文件描述符 2 和进程 B 的文件描述符 2 都指向了同一个文件，这可能是在调用 fork() 后出现的（即进程 A、B 是父子进程关系），或者是不同的进程独自去调用 open() 函数打开了同一个文件，此时进程内部的描述符正好分配到与其他进程打开该文件的描述符一样。</li>
+<li>进程 A 的描述符 0 和进程 B 的描述符 3 分别指向不同的打开文件表项，但这些表项均指向 i-node 表的同一个条目（标号为 1976）；换言之，它们指向了同一个文件。发生这种情况是因为每个进程各自对同一个文件发起了 open() 调用。同一个进程两次打开同一个文件，也会发生类似情况。 </li>
+</ul>
+<p>有了以上对文件描述符的认知，我们很容易理解以下情形：</p>
+<ul>
+<li>同一个进程的不同文件描述符可以指向同一个文件；</li>
+<li>不同进程可以拥有相同的文件描述符；</li>
+<li>不同进程的同一个文件描述符可以指向不同的文件（一般也是这样，除了 0、1、2 这三个特殊的文件）；</li>
+<li>不同进程的不同文件描述符也可以指向同一个文件。</li>
+</ul>
+<p><strong>总结：</strong>文件描述符实际上就是文件描述符表的下标，每个进程有自己的文件描述符表，但是<strong>打开文件表</strong>和<strong>i-node表</strong>整个系统只有一个。</p>
+
+        <!-- 分类文章 -->
+        
+          <div class="post-categoris-bottom">
+            <div class="post-categoris-name">Linux</div>
+            <ul>
+            
+            
+              
+            
+            
+            
+              
+            
+            
+            
+              
+            
+            
+            
+            
+            
+              
+                <li class="me base">
+                  <a  href="/2022/09/28/Linux%E6%96%87%E4%BB%B6%E6%8F%8F%E8%BF%B0%E7%AC%A6%E5%88%B0%E5%BA%95%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F/" class="post-categoris-bottom-link">
+                  Linux文件描述符到底是什么？
+                </a>
+                </li>
+              
+              
+            
+            
+            </ul>
+
+          </div>
+
+        
+      </div>
+      <div class="post-content-inner-space">
+        
+          <div class="space-toc-main animate__animated  animate__fadeInUp">
+            
+           </div>
+        
+      </div>
+   </div>
+    <!-- 评论 -->
+    
+  </div>
+</article>
+  </div>
+</div>
+
+
+
+<!-- 如果是home模式的话，不在首页就显示footer，如果不是home模式的话 所有都显示footer -->
+
+  <div class="footer-outer animate__animated  animate__fadeInUp">
+    <div class="footer-inner">
+    <div class="footer-text">
+    <p>chase</p>
+
+    </div>
+    <div class="footer-contact">
+    <ul class="footer-ul">
+        
+        <li class="footer-li">
+            <a href="https://github.com/RgazHTale" target="_blank">
+                <i class="ri-github-line"></i>
+            </a>
+        </li>
+        
+        <li class="footer-li">
+            <a href="mailto:674260933@qq.com" target="_blank">
+                <i class="ri-mail-line"></i>
+            </a>
+        </li>
+        
+    </ul>
+    </div>
+    </div>
+</div>
+
+
+
+
+
+
+<script src="/js/white.js"></script>
+
+
+
+    
+      
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.1/build/highlight.min.js"></script>
+
+      <script>hljs.initHighlightingOnLoad();</script>
+    
+
+</body>
+</html>
